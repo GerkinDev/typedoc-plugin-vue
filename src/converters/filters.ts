@@ -1,7 +1,8 @@
-import { DeclarationReflection, Reflection, ReflectionKind } from 'typedoc/dist/lib/models';
+import { Reflection, ReflectionKind } from 'typedoc/dist/lib/models';
 
-export const getKindStr = ( kind: ReflectionKind ) => Object.entries( ReflectionKind ).find( ( [, v] ) => v === kind )?.[0];
-export const filterTags = ( reflection: Reflection, tagName: string, constraintHost: ReflectionKind | ReflectionKind[], single: boolean ) => {
+import { getKindStr } from './utils';
+
+export const filterTags = ( reflection: Reflection, tagName: string, constraintHost: ReflectionKind | readonly ReflectionKind[], single: boolean ) => {
 	const matchedTags = reflection.comment?.tags?.filter( t => t.tagName === tagName ) ?? [];
 	// If no tags, exit now
 	if ( matchedTags.length === 0 ) {

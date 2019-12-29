@@ -13,7 +13,7 @@ const models_1 = require("typedoc/dist/lib/models");
 const ReflectionGroup_1 = require("typedoc/dist/lib/models/ReflectionGroup");
 const utils_1 = require("typedoc/dist/lib/utils");
 const utils_2 = require("../utils");
-const filters_1 = require("./filters");
+const utils_3 = require("./utils");
 let VueDocEventConverter = VueDocEventConverter_1 = class VueDocEventConverter extends components_1.ConverterComponent {
     static groupFor(reflection) {
         return this._groupFor(reflection, false);
@@ -23,51 +23,25 @@ let VueDocEventConverter = VueDocEventConverter_1 = class VueDocEventConverter e
         this.listenTo(this.owner, converter_1.Converter.EVENT_RESOLVE, this.onResolveReflection, -200);
     }
     declareReflectionEvent(context, targetReflection, kind) {
-        const eventTags = filters_1.filterTags(targetReflection, 'vue-event', kind, false);
-        if (!eventTags || eventTags.length === 0) {
+        const eventInfos = utils_3.parseVirtFn(targetReflection, 'vue-event', kind);
+        // If no events, exit now.
+        if (eventInfos.length === 0) {
             return;
         }
         // Create or get the vue category & the model group
         const host = targetReflection.kind === models_1.ReflectionKind.CallSignature ? targetReflection.parent.parent : targetReflection;
         const modelGroup = VueDocEventConverter_1._groupFor(host, true);
-        const eventParamsTags = filters_1.filterTags(targetReflection, 'vue-event-param', kind, false);
-        // Extract slot parameter infos
-        const eventParamInfos = eventParamsTags
-            .map(tag => {
-            const tagTextParts = tag.text.split(/\s/);
-            return {
-                eventName: tagTextParts[0].trim(),
-                paramName: tagTextParts[1].trim(),
-                tag,
-                text: tagTextParts.slice(3).join(' ').trim(),
-                type: tagTextParts[2].trim(),
-            };
-        });
-        // Aggregate parameters & slots declarations
-        const eventInfos = eventTags
-            .map(tag => {
-            const tagTextParts = tag.text.split(/\s/);
-            return {
-                eventName: tagTextParts[0].trim(),
-                tag,
-                text: tagTextParts.slice(1).join(' ').trim(),
-            };
-        })
-            .map(slotInfo => ({
-            event: slotInfo,
-            params: eventParamInfos.filter(slotParam => slotParam.eventName === slotInfo.eventName),
-        }));
         context.withScope(host, () => {
-            eventInfos.forEach(tag => {
-                const eventReflection = new models_1.DeclarationReflection(tag.event.eventName, models_1.ReflectionKind.Event);
+            eventInfos.forEach(eventInfo => {
+                const eventReflection = new models_1.DeclarationReflection(eventInfo.name, models_1.ReflectionKind.Event);
                 eventReflection.setFlag(models_1.ReflectionFlag.Exported, true);
                 eventReflection.setFlag(models_1.ReflectionFlag.Public, true);
-                const eventSignatureReflection = new models_1.SignatureReflection(tag.event.eventName, models_1.ReflectionKind.CallSignature);
-                eventSignatureReflection.comment = new models_1.Comment(tag.event.text);
-                eventSignatureReflection.parameters = tag.params.map(p => {
-                    const paramReflection = new models_1.ParameterReflection(p.paramName, models_1.ReflectionKind.Parameter);
-                    paramReflection.comment = new models_1.Comment(p.text);
-                    paramReflection.type = new models_1.ReferenceType(p.type, models_1.ReferenceType.SYMBOL_ID_RESOLVE_BY_NAME);
+                const eventSignatureReflection = new models_1.SignatureReflection(eventInfo.name, models_1.ReflectionKind.CallSignature);
+                eventSignatureReflection.comment = new models_1.Comment(eventInfo.description);
+                eventSignatureReflection.parameters = eventInfo.params.map(p => {
+                    const paramReflection = new models_1.ParameterReflection(p.name, models_1.ReflectionKind.Parameter);
+                    paramReflection.comment = new models_1.Comment(p.description);
+                    paramReflection.type = new models_1.ReferenceType(p.type || 'unknown', models_1.ReferenceType.SYMBOL_ID_RESOLVE_BY_NAME);
                     return paramReflection;
                 });
                 eventReflection.signatures = [eventSignatureReflection];
@@ -75,8 +49,8 @@ let VueDocEventConverter = VueDocEventConverter_1 = class VueDocEventConverter e
                 eventReflection.parent = host;
                 context.registerReflection(eventReflection);
                 // Clear the doc tags
-                utils_2.removeTag(targetReflection, tag.event.tag);
-                tag.params.forEach(eventParam => utils_2.removeTag(targetReflection, eventParam.tag));
+                utils_2.removeTag(targetReflection, eventInfo.tag);
+                eventInfo.params.forEach(eventParam => utils_2.removeTag(targetReflection, eventParam.tag));
             });
         });
     }
