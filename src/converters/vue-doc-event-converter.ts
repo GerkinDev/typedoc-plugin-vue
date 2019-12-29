@@ -7,6 +7,7 @@ import { Component } from 'typedoc/dist/lib/utils';
 
 import { makeAutoGenRegistry, PLUGIN_NAME, removeTag } from '../utils';
 import { filterTags } from './filters';
+import { parseVirtFn } from './utils';
 
 @Component( { name: `${PLUGIN_NAME}-event-converter` } )
 export class VueDocEventConverter extends ConverterComponent {
@@ -21,8 +22,10 @@ export class VueDocEventConverter extends ConverterComponent {
 	}
 
 	private declareReflectionEvent( context: Context, targetReflection: DeclarationReflection | SignatureReflection, kind: ReflectionKind ) {
-		const eventTags = filterTags( targetReflection, 'vue-event', kind, false );
-		if ( !eventTags || eventTags.length === 0 ) {
+		const eventInfos = parseVirtFn( targetReflection, 'vue-event', kind );
+
+		// If no events, exit now.
+		if ( eventInfos.length === 0 ) {
 			return;
 		}
 
@@ -30,46 +33,18 @@ export class VueDocEventConverter extends ConverterComponent {
 		const host = targetReflection.kind === ReflectionKind.CallSignature ? targetReflection.parent!.parent! : targetReflection;
 		const modelGroup = VueDocEventConverter._groupFor( host, true );
 
-		const eventParamsTags = filterTags( targetReflection, 'vue-event-param', kind, false );
-		// Extract slot parameter infos
-		const eventParamInfos = eventParamsTags
-			.map( tag => {
-				const tagTextParts = tag.text.split( /\s/ );
-				return {
-					eventName: tagTextParts[0].trim(),
-					paramName: tagTextParts[1].trim(),
-					tag,
-					text: tagTextParts.slice( 3 ).join( ' ' ).trim(),
-					type: tagTextParts[2].trim(),
-				};
-			} );
-		// Aggregate parameters & slots declarations
-		const eventInfos = eventTags
-			.map( tag => {
-				const tagTextParts = tag.text.split( /\s/ );
-				return {
-					eventName: tagTextParts[0].trim(),
-					tag,
-					text: tagTextParts.slice( 1 ).join( ' ' ).trim(),
-				};
-			} )
-			.map( slotInfo => ( {
-				event: slotInfo,
-				params: eventParamInfos.filter( slotParam => slotParam.eventName === slotInfo.eventName ),
-			} ) );
-
 		context.withScope( host, () => {
-			eventInfos.forEach( tag => {
-				const eventReflection = new DeclarationReflection( tag.event.eventName, ReflectionKind.Event );
+			eventInfos.forEach( eventInfo => {
+				const eventReflection = new DeclarationReflection( eventInfo.name, ReflectionKind.Event );
 				eventReflection.setFlag( ReflectionFlag.Exported, true );
 				eventReflection.setFlag( ReflectionFlag.Public, true );
 
-				const eventSignatureReflection = new SignatureReflection( tag.event.eventName, ReflectionKind.CallSignature );
-				eventSignatureReflection.comment = new Comment( tag.event.text );
-				eventSignatureReflection.parameters = tag.params.map( p => {
-					const paramReflection = new ParameterReflection( p.paramName, ReflectionKind.Parameter );
-					paramReflection.comment = new Comment( p.text );
-					paramReflection.type = new ReferenceType( p.type, ReferenceType.SYMBOL_ID_RESOLVE_BY_NAME );
+				const eventSignatureReflection = new SignatureReflection( eventInfo.name, ReflectionKind.CallSignature );
+				eventSignatureReflection.comment = new Comment( eventInfo.description );
+				eventSignatureReflection.parameters = eventInfo.params.map( p => {
+					const paramReflection = new ParameterReflection( p.name, ReflectionKind.Parameter );
+					paramReflection.comment = new Comment( p.description );
+					paramReflection.type = new ReferenceType( p.type || 'unknown', ReferenceType.SYMBOL_ID_RESOLVE_BY_NAME );
 					return paramReflection;
 				} );
 				eventReflection.signatures = [eventSignatureReflection];
@@ -79,8 +54,8 @@ export class VueDocEventConverter extends ConverterComponent {
 				context.registerReflection( eventReflection );
 
 				// Clear the doc tags
-				removeTag( targetReflection, tag.event.tag );
-				tag.params.forEach( eventParam => removeTag( targetReflection, eventParam.tag ) );
+				removeTag( targetReflection, eventInfo.tag );
+				eventInfo.params.forEach( eventParam => removeTag( targetReflection, eventParam.tag ) );
 			} );
 		} );
 	}
