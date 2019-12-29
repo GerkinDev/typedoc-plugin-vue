@@ -1,0 +1,1 @@
+{"version":3,"file":"vue-doc-renderer.d.ts","sourceRoot":"","sources":["../src/vue-doc-renderer.ts"],"names":[],"mappings":"AAEA,OAAO,EAAE,6BAA6B,EAAE,MAAM,oCAAoC,CAAC;AACnF,OAAO,EAAE,SAAS,EAAE,MAAM,gCAAgC,CAAC;AAM3D,qBACa,cAAe,SAAQ,6BAA6B;IACzD,UAAU;IAIV,WAAW,CAAE,IAAI,EAAE,SAAS;CAqBnC"}
